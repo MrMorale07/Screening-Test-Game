@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Collection Match</title>
+<style>
+  :root {
+    --asphalt: #23262b;
+    --panel: #2f333a;
+    --paint: #f2c230;
+    --chalk: #f3f1ea;
+    --muted: #a9adb5;
+    --good: #5fcf8a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--asphalt);
+    color: var(--chalk);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+  }
+  main { width: 100%; max-width: 480px; }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.9rem;
+    margin: 0 0 6px;
+    letter-spacing: 0.5px;
+  }
+  .stripe {
+    height: 6px;
+    background: repeating-linear-gradient(90deg, var(--paint) 0 28px, transparent 28px 46px);
+    margin-bottom: 14px;
+  }
+  .how {
+    background: var(--panel);
+    border-left: 4px solid var(--paint);
+    padding: 10px 12px;
+    margin: 0 0 14px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .how strong { color: var(--paint); }
+
+  .shelf-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1rem;
+    margin-bottom: 6px;
+  }
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    background: var(--panel);
+    padding: 8px 6px;
+    border-bottom: 5px solid #6b4f2a;
+    margin-bottom: 16px;
+  }
+  .slot {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1rem, 5.5vw, 1.6rem);
+    border: 2px dashed #4a4f58;
+    border-radius: 6px;
+    color: transparent;
+  }
+  .slot.filled { border: 2px solid var(--paint); color: inherit; animation: drop .35s ease-out; }
+  @keyframes drop { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .card {
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 10px;
+    font-size: clamp(2rem, 13vw, 3.4rem);
+    background: var(--paint);
+    color: var(--asphalt);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .15s;
+  }
+  .card:active { transform: scale(0.95); }
+  .card:focus-visible, button:focus-visible { outline: 3px solid var(--chalk); outline-offset: 2px; }
+  .card .face { display: none; }
+  .card .back { font-size: 0.5em; font-weight: bold; font-family: Georgia, serif; }
+  .card.open, .card.matched { background: var(--chalk); }
+  .card.open .face, .card.matched .face { display: block; }
+  .card.open .back, .card.matched .back { display: none; }
+  .card.matched { background: #d7f2e1; box-shadow: inset 0 0 0 3px var(--good); cursor: default; }
+
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    font-size: 1rem;
+  }
+  #best.record { color: var(--paint); font-weight: bold; }
+  .bar {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  button.restart {
+    background: transparent;
+    color: var(--chalk);
+    border: 2px solid var(--chalk);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 1rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.restart:hover { background: var(--chalk); color: var(--asphalt); }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(20, 22, 26, 0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .win {
+    background: var(--panel);
+    border-top: 6px solid var(--paint);
+    padding: 24px;
+    text-align: center;
+    max-width: 340px;
+  }
+  .win h2 { font-family: Georgia, serif; font-size: 1.7rem; margin: 0 0 8px; }
+  .win p { margin: 0 0 16px; line-height: 1.4; }
+  .win button { background: var(--paint); color: var(--asphalt); border: 0; border-radius: 8px; padding: 12px 22px; font-size: 1.05rem; font-weight: bold; cursor: pointer; }
+
+  @media (prefers-reduced-motion: reduce) { .slot.filled { animation: none; } .card { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Car Collection Match</h1>
+  <div class="stripe"></div>
+
+  <p class="how">
+    <strong>Goal:</strong> fill your shelf with all 8 cars.
+    Tap or click two cards to flip them. If the cars match, they go on your shelf.
+    If not, they flip back, so remember where they are!
+  </p>
+
+  <div class="shelf-label">
+    <span>My shelf</span>
+    <span id="count">0 of 8 collected</span>
+  </div>
+  <div class="shelf" id="shelf"></div>
+
+  <div class="board" id="board"></div>
+
+  <div class="stats">
+    <span id="moves">Moves: 0</span>
+    <span id="time">Time: 0:00</span>
+    <span id="best">Best: --</span>
+  </div>
+  <div class="bar">
+    <button class="restart" id="restart">Restart</button>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="win" role="dialog" aria-live="polite">
+    <h2>Collection complete!</h2>
+    <p id="result"></p>
+    <button id="again">Play again</button>
+  </div>
+</div>
+
+<script>
+  var CARS = ["🚗", "🚕", "🚓", "🚑", "🚒", "🚌", "🏎️", "🚜"];
+  var board = document.getElementById("board");
+  var shelf = document.getElementById("shelf");
+  var countEl = document.getElementById("count");
+  var movesEl = document.getElementById("moves");
+  var overlay = document.getElementById("overlay");
+  var resultEl = document.getElementById("result");
+
+  var timeEl = document.getElementById("time");
+  var bestEl = document.getElementById("best");
+
+  var first = null;     // the first card flipped in a turn
+  var locked = false;   // true while two wrong cards are showing
+  var moves = 0;
+  var collected = 0;
+  var startTime = null; // set on the first flip, so the clock starts when you do
+  var timerId = null;
+  var bestMs = null;    // best time in milliseconds, saved in the browser
+
+  function formatTime(ms) {
+    var total = Math.floor(ms / 1000);
+    var sec = total % 60;
+    return Math.floor(total / 60) + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+
+  function loadBest() {
+    try {
+      var saved = parseInt(localStorage.getItem("carMatchBest"), 10);
+      bestMs = isNaN(saved) ? null : saved;
+    } catch (e) { bestMs = null; }
+    bestEl.textContent = "Best: " + (bestMs === null ? "--" : formatTime(bestMs));
+  }
+
+  function startTimer() {
+    startTime = Date.now();
+    timerId = setInterval(function () {
+      timeEl.textContent = "Time: " + formatTime(Date.now() - startTime);
+    }, 250);
+  }
+
+  function stopTimer() {
+    clearInterval(timerId);
+    timerId = null;
+  }
+
+  function shuffle(list) {
+    for (var i = list.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    }
+    return list;
+  }
+
+  function startGame() {
+    first = null; locked = false; moves = 0; collected = 0;
+    stopTimer();
+    startTime = null;
+    timeEl.textContent = "Time: 0:00";
+    bestEl.classList.remove("record");
+    loadBest();
+    movesEl.textContent = "Moves: 0";
+    countEl.textContent = "0 of 8 collected";
+    overlay.classList.remove("show");
+    board.innerHTML = "";
+    shelf.innerHTML = "";
+
+    for (var s = 0; s < CARS.length; s++) {
+      var slot = document.createElement("div");
+      slot.className = "slot";
+      slot.textContent = CARS[s];
+      slot.id = "slot-" + s;
+      shelf.appendChild(slot);
+    }
+
+    var deck = shuffle(CARS.concat(CARS));
+    deck.forEach(function (car) {
+      var card = document.createElement("button");
+      card.className = "card";
+      card.setAttribute("aria-label", "Hidden card");
+      card.dataset.car = car;
+      card.innerHTML = '<span class="back">?</span><span class="face">' + car + "</span>";
+      card.addEventListener("click", function () { flip(card); });
+      board.appendChild(card);
+    });
+  }
+
+  function flip(card) {
+    if (locked) return;
+    if (card.classList.contains("open") || card.classList.contains("matched")) return;
+
+    if (startTime === null) startTimer();
+    card.classList.add("open");
+
+    if (!first) { first = card; return; }
+
+    moves++;
+    movesEl.textContent = "Moves: " + moves;
+    var second = card;
+
+    if (first.dataset.car === second.dataset.car) {
+      first.classList.replace("open", "matched");
+      second.classList.replace("open", "matched");
+      addToShelf(second.dataset.car);
+      first = null;
+    } else {
+      locked = true;
+      setTimeout(function () {
+        first.classList.remove("open");
+        second.classList.remove("open");
+        first = null;
+        locked = false;
+      }, 800);
+    }
+  }
+
+  function addToShelf(car) {
+    document.getElementById("slot-" + CARS.indexOf(car)).classList.add("filled");
+    collected++;
+    countEl.textContent = collected + " of 8 collected";
+    if (collected === CARS.length) {
+      stopTimer();
+      var elapsed = Date.now() - startTime;
+      timeEl.textContent = "Time: " + formatTime(elapsed);
+      var msg = "You collected all 8 cars in " + moves + " moves and " + formatTime(elapsed) + ".";
+      if (bestMs === null || elapsed < bestMs) {
+        bestMs = elapsed;
+        try { localStorage.setItem("carMatchBest", String(elapsed)); } catch (e) {}
+        bestEl.textContent = "Best: " + formatTime(bestMs);
+        bestEl.classList.add("record");
+        msg += " New best time!";
+      }
+      resultEl.textContent = msg;
+      setTimeout(function () { overlay.classList.add("show"); }, 500);
+    }
+  }
+
+  document.getElementById("restart").addEventListener("click", startGame);
+  document.getElementById("again").addEventListener("click", startGame);
+  startGame();
+</script>
+</body>
+</html>
